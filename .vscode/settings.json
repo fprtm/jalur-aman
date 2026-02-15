@@ -1,0 +1,11 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.ts": "${capture}.test.ts, ${capture}.spec.ts",
+    "*.tsx": "${capture}.test.tsx, ${capture}.spec.tsx",
+    "package.json": "package-lock.json, bun.lock, bun.lockb, pnpm-lock.yaml, yarn.lock, .npmrc, .yarnrc, .yarnrc.yml",
+    ".env": ".env.*",
+    "layout.tsx": "layout.css, layout.module.css",
+    "page.tsx": "page.css, page.module.css"
+  }
+}
