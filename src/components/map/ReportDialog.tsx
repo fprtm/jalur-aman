@@ -118,7 +118,7 @@ export function ReportDialog({
                 <SelectTrigger id="type" className="w-full">
                   <SelectValue placeholder="Pilih jenis bencana" />
                 </SelectTrigger>
-                <SelectContent className="z-[10005]">
+                <SelectContent className="z-10005">
                   <SelectItem value="Banjir">Banjir</SelectItem>
                   <SelectItem value="Kebakaran">Kebakaran</SelectItem>
                   <SelectItem value="Gempa Bumi">Gempa Bumi</SelectItem>

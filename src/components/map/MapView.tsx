@@ -1,13 +1,22 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+  Circle,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ReportDialog } from "./ReportDialog";
+import { MapSearch } from "./MapSearch";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Crosshair, Navigation } from "lucide-react";
 
 // Fix for default marker icons
 const DefaultIcon = L.icon({
@@ -34,6 +43,26 @@ interface MapViewProps {
   initialReports?: Report[];
 }
 
+// Controller component to move map programmatically
+function MapController({
+  center,
+  zoom,
+}: {
+  center: [number, number];
+  zoom?: number;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, zoom || map.getZoom(), {
+        animate: true,
+        duration: 1,
+      });
+    }
+  }, [center, zoom, map]);
+  return null;
+}
+
 function MapEvents({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
   const map = useMap();
 
@@ -57,8 +86,8 @@ function MapEvents({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
 }
 
 export default function MapView({
-  center = [-6.2088, 106.8456], // Jakarta
-  zoom = 13,
+  center: initialCenter = [-6.2088, 106.8456], // Jakarta
+  zoom: initialZoom = 13,
   initialReports = [],
 }: MapViewProps) {
   const [reports, setReports] = useState<Report[]>(initialReports);
@@ -68,7 +97,12 @@ export default function MapView({
     lng: number;
   } | null>(null);
 
-  // State for the confirmation popup on map click
+  // Current view state for programmatic control
+  const [viewState, setViewState] = useState({
+    center: initialCenter,
+    zoom: initialZoom,
+  });
+
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const popupMarkerRef = useRef<L.Marker>(null);
 
@@ -102,7 +136,6 @@ export default function MapView({
   const handleMapAction = useCallback((latlng: L.LatLng) => {
     setSelectedCoords({ lat: latlng.lat, lng: latlng.lng });
     setShowConfirmPopup(true);
-    // Explicitly open the popup after state update is usually handled by Leaflet's Marker system
   }, []);
 
   const confirmReport = () => {
@@ -110,26 +143,99 @@ export default function MapView({
     setIsReportOpen(true);
   };
 
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation tidak didukung oleh browser Anda.");
+      return;
+    }
+
+    toast.info("Mencari lokasi akurat Anda...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        console.log("High accuracy position found:", {
+          latitude,
+          longitude,
+          accuracy,
+        });
+
+        setViewState({
+          center: [latitude, longitude],
+          zoom: 17,
+        });
+        setLocationAccuracy(accuracy);
+
+        if (accuracy > 100) {
+          toast.warning(
+            `Lokasi ditemukan, tapi kurang akurat (±${Math.round(accuracy)}m).`,
+          );
+        } else {
+          toast.success("Lokasi akurat ditemukan!");
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        let message = "Gagal mendapatkan lokasi.";
+        if (error.code === 1) message = "Akses lokasi ditolak.";
+        else if (error.code === 3) message = "Waktu pencarian lokasi habis.";
+        toast.error(`${message} Pastikan GPS aktif.`);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    );
+  };
+
+  const handleSearchResult = (lat: number, lng: number) => {
+    setViewState({
+      center: [lat, lng],
+      zoom: 16,
+    });
+  };
+
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border group">
-      {/* Floating Action Button */}
-      <div className="absolute top-4 right-4 z-1000">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shadow-md border font-bold bg-white hover:bg-zinc-50 text-primary"
-          onClick={() => {
-            handleMapAction(L.latLng(center[0], center[1]));
-            toast.info("Tentukan lokasi laporan pada peta.");
-          }}
-        >
-          Lapor Bahaya
-        </Button>
+      {/* Search Header Overlay */}
+      <div className="absolute top-4 left-14 right-4 z-1000 flex flex-col sm:flex-row gap-2 pointer-events-none">
+        <MapSearch
+          onLocationSelect={handleSearchResult}
+          className="pointer-events-auto shadow-md"
+        />
+
+        <div className="flex gap-2 pointer-events-auto ml-auto sm:ml-0">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="bg-white hover:bg-zinc-50 shadow-md h-9 w-9"
+            onClick={handleLocateMe}
+            title="Lokasi Saya"
+          >
+            <Navigation className="h-4 w-4 text-primary" />
+          </Button>
+
+          {/* <Button
+            variant="secondary"
+            size="sm"
+            className="shadow-md border font-bold bg-white hover:bg-zinc-50 text-primary h-9"
+            onClick={() => {
+              handleMapAction(
+                L.latLng(viewState.center[0], viewState.center[1]),
+              );
+              toast.info("Tentukan lokasi laporan pada peta.");
+            }}
+          >
+            Lapor Bahaya
+          </Button> */}
+        </div>
       </div>
 
       <MapContainer
-        center={center}
-        zoom={zoom}
+        center={viewState.center}
+        zoom={viewState.zoom}
         scrollWheelZoom={true}
         className="h-full w-full"
       >
@@ -138,7 +244,23 @@ export default function MapView({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapController center={viewState.center} zoom={viewState.zoom} />
         <MapEvents onMapClick={handleMapAction} />
+
+        {/* User Location Accuracy Circle */}
+        {locationAccuracy && (
+          <Circle
+            center={viewState.center}
+            radius={locationAccuracy}
+            pathOptions={{
+              fillColor: "blue",
+              fillOpacity: 0.1,
+              color: "blue",
+              weight: 1,
+              dashArray: "5, 5",
+            }}
+          />
+        )}
 
         {/* Existing Reports */}
         {reports.map((report) => (
