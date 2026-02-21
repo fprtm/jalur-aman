@@ -1,0 +1,60 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { db } from "@/db";
+import { disasterReports } from "@/db/schemas";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+const reportSchema = z.object({
+  disasterType: z.string().min(1, "Jenis bencana harus diisi"),
+  description: z.string().optional(),
+  severityLevel: z.number().min(1).max(5),
+  lat: z.number(),
+  lng: z.number(),
+});
+
+export async function createReport(formData: z.infer<typeof reportSchema>) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Silakan login terlebih dahulu." };
+    }
+
+    const validatedData = reportSchema.parse(formData);
+
+    await db.insert(disasterReports).values({
+      userId: user.id,
+      disasterType: validatedData.disasterType,
+      description: validatedData.description,
+      severityLevel: validatedData.severityLevel,
+      location: { lat: validatedData.lat, lng: validatedData.lng },
+      status: "PENDING_AI", // Default
+    });
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating report:", error);
+    if (error instanceof z.ZodError) {
+      return { error: error.issues[0].message };
+    }
+    return { error: "Gagal mengirim laporan. Silakan coba lagi." };
+  }
+}
+
+export async function getReports() {
+  try {
+    const reports = await db.query.disasterReports.findMany({
+      orderBy: (reports, { desc }) => [desc(reports.createdAt)],
+    });
+    return reports;
+  } catch (error) {
+    console.error("Error fetching reports:", error);
+    return [];
+  }
+}
