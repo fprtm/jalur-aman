@@ -12,10 +12,10 @@
  * by using mocks for deterministic and isolated behavior.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { updateSession } from "@/lib/supabase/middleware";
-import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { updateSession } from "@/lib/supabase/middleware";
 
 // Mock Supabase client factory
 vi.mock("@supabase/ssr", () => ({

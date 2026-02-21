@@ -1,13 +1,13 @@
 import {
+  customType,
+  doublePrecision,
+  integer,
+  pgEnum,
   pgTable,
+  text,
+  timestamp,
   uuid,
   varchar,
-  text,
-  integer,
-  timestamp,
-  doublePrecision,
-  pgEnum,
-  customType,
 } from "drizzle-orm/pg-core";
 
 export const reportStatusEnum = pgEnum("report_status", [
@@ -27,7 +27,7 @@ const geographyPoint = customType<{
     return `POINT(${value.lng} ${value.lat})`;
   },
   fromDriver(value) {
-    const matches = value.match(/POINT\(([-\d\.]+) ([-\d\.]+)\)/);
+    const matches = value.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
     if (!matches) return { lat: 0, lng: 0 };
     return { lng: parseFloat(matches[1]), lat: parseFloat(matches[2]) };
   },
