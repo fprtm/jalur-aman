@@ -27,21 +27,13 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-interface Report {
-  id: string;
-  disasterType: string;
-  severityLevel: number;
-  description: string | null;
-  imageUrl: string | null;
-  location: { lat: number; lng: number };
-  status: string;
-  createdAt: string | Date | null;
-}
+import { Report } from "@/types/report";
 
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
   initialReports?: Report[];
+  selectedReportId?: string | null;
 }
 
 // Controller component to move map programmatically
@@ -90,6 +82,7 @@ export default function MapView({
   center: initialCenter = [-6.2088, 106.8456], // Jakarta
   zoom: initialZoom = 13,
   initialReports = [],
+  selectedReportId,
 }: MapViewProps) {
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -97,6 +90,10 @@ export default function MapView({
     lat: number;
     lng: number;
   } | null>(null);
+
+  // Refs to markers to open popups programmatically
+  const markerRefs = useRef<{ [key: string]: L.Marker | null }>({});
+  const mapRef = useRef<L.Map | null>(null);
 
   // Current view state for programmatic control
   const [viewState, setViewState] = useState({
@@ -118,6 +115,27 @@ export default function MapView({
     })) as Report[];
     setReports(mappedReports);
   }, [initialReports]);
+
+  // Handle selected report change from sidebar
+  useEffect(() => {
+    if (selectedReportId) {
+      const report = reports.find((r) => r.id === selectedReportId);
+      if (report && mapRef.current) {
+        // Pan to location
+        mapRef.current.flyTo([report.location.lat, report.location.lng], 16, {
+          duration: 1.5,
+        });
+
+        // Open popup after a short delay to allow move to finish
+        setTimeout(() => {
+          const marker = markerRefs.current[selectedReportId];
+          if (marker) {
+            marker.openPopup();
+          }
+        }, 1600);
+      }
+    }
+  }, [selectedReportId, reports]);
 
   useEffect(() => {
     const channel = supabase
@@ -254,6 +272,7 @@ export default function MapView({
         zoom={viewState.zoom}
         scrollWheelZoom={true}
         className="h-full w-full"
+        ref={mapRef}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -283,6 +302,9 @@ export default function MapView({
           <Marker
             key={report.id}
             position={[report.location.lat, report.location.lng]}
+            ref={(el) => {
+              markerRefs.current[report.id] = el;
+            }}
           >
             <Popup>
               <div className="flex flex-col gap-1 min-w-[180px]">

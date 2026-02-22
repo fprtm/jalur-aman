@@ -16,6 +16,17 @@ const MapView = dynamic(() => import("./MapView"), {
   ),
 });
 
-export function MapClient({ initialReports }: { initialReports: any[] }) {
-  return <MapView initialReports={initialReports} />;
+export function MapClient({
+  initialReports,
+  selectedReportId,
+}: {
+  initialReports: any[];
+  selectedReportId?: string | null;
+}) {
+  return (
+    <MapView
+      initialReports={initialReports}
+      selectedReportId={selectedReportId}
+    />
+  );
 }
