@@ -56,7 +56,7 @@ export async function compressImage(
               reject(new Error("Gagal melakukan kompresi gambar."));
             }
           },
-          "image/jpeg, image/png, image/jpg",
+          "image/jpeg",
           quality,
         );
       };

@@ -67,12 +67,16 @@ export function ReportDialog({
 
     try {
       setIsPending(true);
-      const compressedBlob = await compressImage(file, 1024, 1024, 0.6);
+      const compressedBlob = await compressImage(file, 800, 800, 0.5);
 
-      const compressedFile = new File([compressedBlob], file.name, {
-        type: compressedBlob.type,
-        lastModified: Date.now(),
-      });
+      const compressedFile = new File(
+        [compressedBlob],
+        file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+        {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        },
+      );
 
       setImageFile(compressedFile);
 

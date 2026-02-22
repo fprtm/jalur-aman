@@ -39,14 +39,13 @@ export async function validateReportWithAI(reportId: string) {
       .set({ status: "VALIDATING" })
       .where(eq(disasterReports.id, reportId));
 
-    revalidatePath("/");
     console.log(
       `[AI] Status updated to VALIDATING for ${reportId}. Calling Gemini...`,
     );
 
     // Call Gemini via Vercel AI SDK
     const { object } = await generateObject({
-      model: google("gemini-1.5-flash-latest"),
+      model: google("gemini-2.5-flash-lite"),
       schema: validationSchema,
       messages: [
         {
@@ -54,11 +53,36 @@ export async function validateReportWithAI(reportId: string) {
           content: [
             {
               type: "text",
-              text: `Validasi laporan bencana berikut:
-              Jenis Bencana: ${report.disasterType}
-              Deskripsi: ${report.description || "Tidak ada deskripsi"}
-              
-              Apakah foto ini benar-benar menunjukkan kejadian tersebut? Berikan skor kepercayaan (0.0 - 1.0) dan tentukan isValid.`,
+              text: `
+Kamu adalah sistem AI validasi laporan bencana.
+
+Tugas:
+Evaluasi apakah foto yang diberikan benar-benar merepresentasikan laporan berikut.
+
+Data Laporan:
+- Jenis Bencana: ${report.disasterType}
+- Deskripsi: ${report.description || "Tidak ada deskripsi"}
+
+Instruksi Analisis:
+1. Identifikasi objek, kondisi lingkungan, dan indikasi visual utama pada gambar.
+2. Cocokkan elemen visual dengan jenis bencana yang dilaporkan.
+3. Periksa konsistensi antara foto dan deskripsi.
+4. Deteksi kemungkinan:
+   - Foto tidak relevan
+   - Foto lama / generik
+   - Foto tidak menunjukkan kejadian bencana
+5. Jika bukti visual tidak cukup jelas, turunkan skor kepercayaan.
+
+Output yang diminta:
+- confidenceScore: angka 0.0 – 1.0
+- isValid: boolean (true jika kemungkinan besar sesuai)
+- reasoning: penjelasan singkat berbasis observasi visual (bukan asumsi)
+
+Aturan penting:
+- Jangan menebak di luar bukti visual.
+- Jangan mengarang detail yang tidak terlihat.
+- Jika gambar ambigu, beri skor rendah.
+`,
             },
             {
               type: "image",
@@ -88,10 +112,13 @@ export async function validateReportWithAI(reportId: string) {
   } catch (error: any) {
     console.error("[AI] Fatal Validation Error:", error);
 
-    // Reset to PENDING_AI if it failed so we can try again later, or mark as REJECTED
+    // Update with REJECTED status and provide the error as reasoning so user knows why
     await db
       .update(disasterReports)
-      .set({ status: "REJECTED" }) // Or keep as PENDING_AI
+      .set({
+        status: "REJECTED",
+        aiReasoning: `Gagal validasi AI: ${error.message || "Kesalahan teknis pada engine AI."}`,
+      })
       .where(eq(disasterReports.id, reportId));
 
     return { error: `Gagal melakukan validasi AI: ${error.message}` };

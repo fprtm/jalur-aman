@@ -53,6 +53,7 @@ export function DashboardContainer({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "disaster_reports" },
         (payload) => {
+          console.log("[Realtime] INSERT received:", payload);
           const newReport = payload.new as any;
           let location = newReport.location;
           if (typeof location === "string") {
@@ -72,6 +73,7 @@ export function DashboardContainer({
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "disaster_reports" },
         (payload) => {
+          console.log("[Realtime] UPDATE received:", payload);
           const updated = payload.new as any;
           let location = updated.location;
           if (typeof location === "string") {
