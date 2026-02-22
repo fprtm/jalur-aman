@@ -32,18 +32,29 @@ export async function createReport(formData: z.infer<typeof reportSchema>) {
 
     const validatedData = reportSchema.parse(formData);
 
-    await db.insert(disasterReports).values({
-      userId: user.id,
-      disasterType: validatedData.disasterType,
-      description: validatedData.description,
-      imageUrl: validatedData.imageUrl || null,
-      severityLevel: validatedData.severityLevel,
-      location: { lat: validatedData.lat, lng: validatedData.lng },
-      status: "PENDING_AI", // Default
-    });
+    const [newReport] = await db
+      .insert(disasterReports)
+      .values({
+        userId: user.id,
+        disasterType: validatedData.disasterType,
+        description: validatedData.description,
+        imageUrl: validatedData.imageUrl || null,
+        severityLevel: validatedData.severityLevel,
+        location: { lat: validatedData.lat, lng: validatedData.lng },
+        status: "PENDING_AI", // Default
+      })
+      .returning({ id: disasterReports.id });
+
+    // Trigger AI validation in the background (no await to keep UI fast)
+    // Or await it if you want the user to see the result immediately.
+    // Let's await for now so the user sees the 'Verified' status quickly.
+    if (newReport.id) {
+      const { validateReportWithAI } = await import("./ai-actions");
+      validateReportWithAI(newReport.id).catch(console.error);
+    }
 
     revalidatePath("/");
-    return { success: true };
+    return { success: true, id: newReport.id };
   } catch (error) {
     console.error("Error creating report:", error);
     if (error instanceof z.ZodError) {

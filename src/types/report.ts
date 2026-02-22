@@ -6,5 +6,6 @@ export interface Report {
   imageUrl: string | null;
   location: { lat: number; lng: number };
   status: string;
+  aiReasoning?: string | null;
   createdAt: string | Date | null;
 }

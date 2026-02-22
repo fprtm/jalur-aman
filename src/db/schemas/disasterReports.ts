@@ -12,6 +12,7 @@ import {
 
 export const reportStatusEnum = pgEnum("report_status", [
   "PENDING_AI",
+  "VALIDATING",
   "VERIFIED",
   "REJECTED",
 ]);
@@ -79,6 +80,7 @@ export const disasterReports = pgTable("disaster_reports", {
   severityLevel: integer("severity_level"),
   status: reportStatusEnum("status").default("PENDING_AI"),
   aiConfidenceScore: doublePrecision("ai_confidence_score"),
+  aiReasoning: text("ai_reasoning"),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -84,7 +84,7 @@ export default function MapView({
   initialReports = [],
   selectedReportId,
 }: MapViewProps) {
-  const [reports, setReports] = useState<Report[]>(initialReports);
+  // Use reports from props (managed by DashboardContainer)
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState<{
     lat: number;
@@ -104,8 +104,6 @@ export default function MapView({
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const popupMarkerRef = useRef<L.Marker>(null);
 
-  const supabase = createClient();
-
   // Fix for "blue map" / blank tiles on load
   useEffect(() => {
     if (mapRef.current) {
@@ -115,20 +113,10 @@ export default function MapView({
     }
   }, []);
 
-  useEffect(() => {
-    // Map initial reports to match our interface
-    const mappedReports = initialReports.map((r: any) => ({
-      ...r,
-      imageUrl: r.imageUrl || r.image_url,
-      createdAt: r.createdAt || r.created_at,
-    })) as Report[];
-    setReports(mappedReports);
-  }, [initialReports]);
-
   // Handle selected report change from sidebar
   useEffect(() => {
     if (selectedReportId) {
-      const report = reports.find((r) => r.id === selectedReportId);
+      const report = initialReports.find((r) => r.id === selectedReportId);
       if (report && mapRef.current) {
         const targetCoords: [number, number] = [
           report.location.lat,
@@ -155,66 +143,7 @@ export default function MapView({
         }, 1600);
       }
     }
-  }, [selectedReportId, reports]);
-
-  // Helper to parse WKB Hex from PostGIS to {lat, lng}
-  const parseWKB = (wkb: string) => {
-    if (typeof wkb !== "string" || wkb.length < 50) return null;
-    try {
-      const hex = wkb.toUpperCase();
-      // Look for the SRID 4326 pattern or just take the last 32 chars (coords)
-      const coordsHex = hex.includes("0101000020E6100000")
-        ? hex.split("0101000020E6100000")[1]
-        : hex.substring(hex.length - 32);
-
-      const bytes = new Uint8Array(
-        coordsHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)),
-      );
-      const view = new DataView(bytes.buffer);
-      return {
-        lng: view.getFloat64(0, true),
-        lat: view.getFloat64(8, true),
-      };
-    } catch (e) {
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("disaster_reports_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "disaster_reports",
-        },
-        (payload) => {
-          const newReport = payload.new as any;
-
-          // Parse location if it's a hex string (WKB)
-          let location = newReport.location;
-          if (typeof location === "string") {
-            location = parseWKB(location) || { lat: 0, lng: 0 };
-          }
-
-          // Map snake_case from DB to camelCase for UI interface
-          const mappedReport: Report = {
-            ...newReport,
-            location: location,
-            imageUrl: newReport.image_url,
-            createdAt: newReport.created_at,
-          };
-          setReports((prev) => [mappedReport, ...prev]);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
+  }, [selectedReportId, initialReports]);
 
   const handleMapAction = useCallback((latlng: L.LatLng) => {
     setSelectedCoords({ lat: latlng.lat, lng: latlng.lng });
@@ -347,7 +276,7 @@ export default function MapView({
         )}
 
         {/* Existing Reports */}
-        {reports.map((report) => (
+        {initialReports.map((report) => (
           <Marker
             key={report.id}
             position={[report.location.lat, report.location.lng]}
@@ -370,25 +299,43 @@ export default function MapView({
                   <span className="font-bold text-sm text-primary">
                     {report.disasterType}
                   </span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                      report.severityLevel >= 4
-                        ? "bg-red-100 text-red-700"
-                        : "bg-zinc-100 text-zinc-600"
-                    }`}
-                  >
-                    Lv. {report.severityLevel}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        report.status === "VERIFIED"
+                          ? "bg-green-500"
+                          : report.status === "REJECTED"
+                            ? "bg-red-500"
+                            : "bg-yellow-500 animate-pulse"
+                      }`}
+                    />
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        report.severityLevel >= 4
+                          ? "bg-red-100 text-red-700"
+                          : "bg-zinc-100 text-zinc-600"
+                      }`}
+                    >
+                      Lv. {report.severityLevel}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground m-0 leading-tight">
                   {report.description || "Tidak ada deskripsi."}
                 </p>
+                {report.aiReasoning && (
+                  <div className="mt-2 p-1.5 bg-zinc-50 rounded border border-zinc-100 text-[9px] italic text-zinc-500 leading-tight">
+                    AI: {report.aiReasoning}
+                  </div>
+                )}
                 <div className="mt-2 pt-2 border-t text-[9px] text-zinc-400 flex justify-between items-center">
                   <span className="capitalize">
                     {report.status.toLowerCase().replace("_", " ")}
                   </span>
                   <span>
-                    {new Date(report.createdAt!).toLocaleDateString()}
+                    {report.createdAt
+                      ? new Date(report.createdAt).toLocaleDateString()
+                      : "-"}
                   </span>
                 </div>
               </div>
