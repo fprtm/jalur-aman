@@ -32,6 +32,7 @@ interface Report {
   disasterType: string;
   severityLevel: number;
   description: string | null;
+  imageUrl: string | null;
   location: { lat: number; lng: number };
   status: string;
   createdAt: string | Date | null;
@@ -109,7 +110,13 @@ export default function MapView({
   const supabase = createClient();
 
   useEffect(() => {
-    setReports(initialReports);
+    // Map initial reports to match our interface
+    const mappedReports = initialReports.map((r: any) => ({
+      ...r,
+      imageUrl: r.imageUrl || r.image_url,
+      createdAt: r.createdAt || r.created_at,
+    })) as Report[];
+    setReports(mappedReports);
   }, [initialReports]);
 
   useEffect(() => {
@@ -123,7 +130,16 @@ export default function MapView({
           table: "disaster_reports",
         },
         (payload) => {
-          setReports((prev) => [payload.new as Report, ...prev]);
+          const newReport = payload.new as any;
+          // Map snake_case from DB to camelCase for UI interface
+          const mappedReport: Report = {
+            ...newReport,
+            lat: newReport.location?.lat,
+            lng: newReport.location?.lng,
+            imageUrl: newReport.image_url,
+            createdAt: newReport.created_at,
+          };
+          setReports((prev) => [mappedReport, ...prev]);
         },
       )
       .subscribe();
@@ -269,7 +285,16 @@ export default function MapView({
             position={[report.location.lat, report.location.lng]}
           >
             <Popup>
-              <div className="flex flex-col gap-1 min-w-[150px]">
+              <div className="flex flex-col gap-1 min-w-[180px]">
+                {report.imageUrl && (
+                  <div className="relative aspect-video w-full mb-1 rounded overflow-hidden border">
+                    <img
+                      src={report.imageUrl}
+                      alt={report.disasterType}
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-primary">
                     {report.disasterType}

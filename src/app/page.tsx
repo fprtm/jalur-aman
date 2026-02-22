@@ -64,8 +64,17 @@ export default async function Home() {
                 reports.map((report) => (
                   <div
                     key={report.id}
-                    className="p-3 rounded-xl border bg-card text-card-foreground shadow-sm hover:border-primary/50 transition-colors"
+                    className="p-3 rounded-xl border bg-card text-card-foreground shadow-sm hover:border-primary/50 transition-all group overflow-hidden"
                   >
+                    {report.imageUrl && (
+                      <div className="relative aspect-video w-full mb-3 rounded-lg overflow-hidden border bg-zinc-50">
+                        <img
+                          src={report.imageUrl}
+                          alt={report.disasterType}
+                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-bold text-sm">
                         {report.disasterType}
@@ -85,8 +94,20 @@ export default async function Home() {
                     <p className="text-xs text-muted-foreground line-clamp-2">
                       {report.description || "Tidak ada deskripsi."}
                     </p>
-                    <div className="mt-2 text-[9px] text-muted-foreground">
-                      {new Date(report.createdAt!).toLocaleString("id-ID")}
+                    <div className="mt-2 flex items-center justify-between text-[9px] text-muted-foreground border-t pt-2 border-zinc-50">
+                      <span className="capitalize">
+                        {report.status?.toLowerCase().replace("_", " ")}
+                      </span>
+                      <span>
+                        {report.createdAt
+                          ? new Date(report.createdAt).toLocaleString("id-ID", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "-"}
+                      </span>
                     </div>
                   </div>
                 ))

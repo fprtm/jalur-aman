@@ -9,6 +9,11 @@ import { z } from "zod";
 const reportSchema = z.object({
   disasterType: z.string().min(1, "Jenis bencana harus diisi"),
   description: z.string().optional(),
+  imageUrl: z
+    .string()
+    .url("Format URL gambar tidak valid")
+    .optional()
+    .or(z.literal("")),
   severityLevel: z.number().min(1).max(5),
   lat: z.number(),
   lng: z.number(),
@@ -31,6 +36,7 @@ export async function createReport(formData: z.infer<typeof reportSchema>) {
       userId: user.id,
       disasterType: validatedData.disasterType,
       description: validatedData.description,
+      imageUrl: validatedData.imageUrl || null,
       severityLevel: validatedData.severityLevel,
       location: { lat: validatedData.lat, lng: validatedData.lng },
       status: "PENDING_AI", // Default
