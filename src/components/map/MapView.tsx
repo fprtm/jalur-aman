@@ -106,6 +106,15 @@ export default function MapView({
 
   const supabase = createClient();
 
+  // Fix for "blue map" / blank tiles on load
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 100);
+    }
+  }, []);
+
   useEffect(() => {
     // Map initial reports to match our interface
     const mappedReports = initialReports.map((r: any) => ({
@@ -121,8 +130,19 @@ export default function MapView({
     if (selectedReportId) {
       const report = reports.find((r) => r.id === selectedReportId);
       if (report && mapRef.current) {
+        const targetCoords: [number, number] = [
+          report.location.lat,
+          report.location.lng,
+        ];
+
+        // Sync viewState so MapController doesn't snap us back
+        setViewState({
+          center: targetCoords,
+          zoom: 16,
+        });
+
         // Pan to location
-        mapRef.current.flyTo([report.location.lat, report.location.lng], 16, {
+        mapRef.current.flyTo(targetCoords, 16, {
           duration: 1.5,
         });
 
@@ -137,6 +157,29 @@ export default function MapView({
     }
   }, [selectedReportId, reports]);
 
+  // Helper to parse WKB Hex from PostGIS to {lat, lng}
+  const parseWKB = (wkb: string) => {
+    if (typeof wkb !== "string" || wkb.length < 50) return null;
+    try {
+      const hex = wkb.toUpperCase();
+      // Look for the SRID 4326 pattern or just take the last 32 chars (coords)
+      const coordsHex = hex.includes("0101000020E6100000")
+        ? hex.split("0101000020E6100000")[1]
+        : hex.substring(hex.length - 32);
+
+      const bytes = new Uint8Array(
+        coordsHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)),
+      );
+      const view = new DataView(bytes.buffer);
+      return {
+        lng: view.getFloat64(0, true),
+        lat: view.getFloat64(8, true),
+      };
+    } catch (e) {
+      return null;
+    }
+  };
+
   useEffect(() => {
     const channel = supabase
       .channel("disaster_reports_realtime")
@@ -149,11 +192,17 @@ export default function MapView({
         },
         (payload) => {
           const newReport = payload.new as any;
+
+          // Parse location if it's a hex string (WKB)
+          let location = newReport.location;
+          if (typeof location === "string") {
+            location = parseWKB(location) || { lat: 0, lng: 0 };
+          }
+
           // Map snake_case from DB to camelCase for UI interface
           const mappedReport: Report = {
             ...newReport,
-            lat: newReport.location?.lat,
-            lng: newReport.location?.lng,
+            location: location,
             imageUrl: newReport.image_url,
             createdAt: newReport.created_at,
           };
