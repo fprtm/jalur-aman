@@ -286,15 +286,31 @@ export default function MapView({
           >
             <Popup>
               <div className="flex flex-col gap-1 min-w-[180px]">
-                {report.imageUrl && (
-                  <div className="relative aspect-video w-full mb-1 rounded overflow-hidden border">
+                {/* Multi-image display */}
+                {report.imageUrls && report.imageUrls.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-1 mb-1">
+                    {report.imageUrls.map((url, i) => (
+                      <div
+                        key={i}
+                        className={`relative aspect-square rounded overflow-hidden border bg-zinc-50 ${i === 0 && report.imageUrls!.length % 2 !== 0 ? "col-span-2 aspect-video" : ""}`}
+                      >
+                        <img
+                          src={url}
+                          alt={`${report.disasterType} ${i + 1}`}
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : report.imageUrl ? (
+                  <div className="relative aspect-video w-full mb-1 rounded overflow-hidden border bg-zinc-50">
                     <img
                       src={report.imageUrl}
                       alt={report.disasterType}
                       className="object-cover w-full h-full"
                     />
                   </div>
-                )}
+                ) : null}
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-primary">
                     {report.disasterType}

@@ -76,6 +76,7 @@ export const disasterReports = pgTable("disaster_reports", {
   disasterType: varchar("disaster_type", { length: 50 }).notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  imageUrls: text("image_urls").array(),
 
   severityLevel: integer("severity_level"),
   status: reportStatusEnum("status").default("PENDING_AI"),

@@ -133,24 +133,24 @@ export async function validateReportWithAI(reportId: string) {
 Kamu adalah sistem AI validasi laporan bencana.
 
 Tugas:
-Evaluasi apakah foto yang diberikan benar-benar merepresentasikan laporan berikut. Gunakan SEMUA konteks di bawah ini untuk menentukan keputusan.
+Evaluasi apakah foto-foto yang diberikan benar-benar merepresentasikan laporan berikut. Gunakan SEMUA konteks di bawah ini untuk menentukan keputusan.
 
 ═══════════════════════════════════
-📋 DATA LAPORAN
+ DATA LAPORAN
 ═══════════════════════════════════
 - Jenis Bencana: ${report.disasterType}
 - Deskripsi: ${report.description || "Tidak ada deskripsi"}
 - Tingkat Keparahan (1-5): ${report.severityLevel ?? "Tidak diset"}
 
 ═══════════════════════════════════
-📍 DATA GEOGRAFIS
+ DATA GEOGRAFIS
 ═══════════════════════════════════
 - Latitude: ${report.location.lat}
 - Longitude: ${report.location.lng}
 - Waktu Laporan: ${reportTime}
 
 ═══════════════════════════════════
-👤 PROFIL PELAPOR
+ PROFIL PELAPOR
 ═══════════════════════════════════
 - Total Laporan yang Pernah Dibuat: ${userStats.total}
 - Laporan Terverifikasi: ${userStats.verified}
@@ -158,16 +158,16 @@ Evaluasi apakah foto yang diberikan benar-benar merepresentasikan laporan beriku
 - Tingkat Hoax: ${userStats.hoaxRate}%
 
 ═══════════════════════════════════
-🗺️ LAPORAN TERDEKAT (radius 5km, 24 jam terakhir)
+ LAPORAN TERDEKAT (radius 5km, 24 jam terakhir)
 ═══════════════════════════════════
 ${nearbyContext}
 
 ═══════════════════════════════════
-🔍 INSTRUKSI ANALISIS
+ INSTRUKSI ANALISIS
 ═══════════════════════════════════
-1. Identifikasi objek, kondisi lingkungan, dan indikasi visual utama pada gambar.
+1. Identifikasi objek, kondisi lingkungan, dan indikasi visual utama pada semua gambar yang disediakan.
 2. Cocokkan elemen visual dengan jenis bencana yang dilaporkan.
-3. Periksa konsistensi antara foto dan deskripsi.
+3. Periksa konsistensi antara foto-foto tersebut dan deskripsi.
 4. Pertimbangkan tingkat keparahan yang dilaporkan vs yang terlihat di foto.
 5. Pertimbangkan profil pelapor:
    - Jika tingkat hoax tinggi (>30%), lebih skeptis terhadap laporan ini.
@@ -193,6 +193,18 @@ Aturan penting:
 - Sertakan faktor kontekstual (profil pelapor, laporan terdekat) dalam reasoning.
 `;
 
+    // Prepare image parts for Gemini
+    const imagesToSend =
+      report.imageUrls && report.imageUrls.length > 0
+        ? report.imageUrls
+        : report.imageUrl
+          ? [report.imageUrl]
+          : [];
+
+    if (imagesToSend.length === 0) {
+      throw new Error("Tidak ada gambar untuk divalidasi.");
+    }
+
     // Call Gemini via Vercel AI SDK
     const { object } = await generateObject({
       model: google("gemini-2.5-flash-lite"),
@@ -205,10 +217,10 @@ Aturan penting:
               type: "text",
               text: enrichedPrompt,
             },
-            {
-              type: "image",
-              image: report.imageUrl,
-            },
+            ...imagesToSend.map((url) => ({
+              type: "image" as const,
+              image: url,
+            })),
           ],
         },
       ],

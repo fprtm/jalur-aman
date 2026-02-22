@@ -14,6 +14,7 @@ const reportSchema = z.object({
     .url("Format URL gambar tidak valid")
     .optional()
     .or(z.literal("")),
+  imageUrls: z.array(z.string().url()).optional(),
   severityLevel: z.number().min(1).max(5),
   lat: z.number(),
   lng: z.number(),
@@ -38,7 +39,9 @@ export async function createReport(formData: z.infer<typeof reportSchema>) {
         userId: user.id,
         disasterType: validatedData.disasterType,
         description: validatedData.description,
-        imageUrl: validatedData.imageUrl || null,
+        imageUrl:
+          validatedData.imageUrl || (validatedData.imageUrls?.[0] ?? null),
+        imageUrls: validatedData.imageUrls || null,
         severityLevel: validatedData.severityLevel,
         location: { lat: validatedData.lat, lng: validatedData.lng },
         status: "PENDING_AI", // Default

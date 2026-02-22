@@ -41,8 +41,8 @@ export function ReportDialog({
   const [disasterType, setDisasterType] = useState("");
   const [severity, setSeverity] = useState("3");
   const [description, setDescription] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   const supabase = createClient();
 
@@ -51,72 +51,87 @@ export function ReportDialog({
       setDisasterType("");
       setSeverity("3");
       setDescription("");
-      setImageFile(null);
-      setImagePreview(null);
+      setImageFiles([]);
+      setImagePreviews([]);
     }
   }, [isOpen, coords]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Ukuran file terlalu besar. Maksimal 2MB.");
+    if (imageFiles.length + files.length > 5) {
+      toast.error("Maksimal 5 foto per laporan.");
       return;
     }
 
+    setIsPending(true);
     try {
-      setIsPending(true);
-      const compressedBlob = await compressImage(file, 800, 800, 0.5);
+      const newFiles: File[] = [];
+      const newPreviews: string[] = [];
 
-      const compressedFile = new File(
-        [compressedBlob],
-        file.name.replace(/\.[^/.]+$/, "") + ".jpg",
-        {
+      for (const file of Array.from(files)) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`File ${file.name} terlalu besar (maks 5MB).`);
+          continue;
+        }
+
+        const compressedBlob = await compressImage(file, 800, 800, 0.5);
+        const fileName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+        const compressedFile = new File([compressedBlob], fileName, {
           type: "image/jpeg",
           lastModified: Date.now(),
-        },
-      );
+        });
 
-      setImageFile(compressedFile);
+        newFiles.push(compressedFile);
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(compressedFile);
+        // Generate preview
+        const preview = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(compressedFile);
+        });
+        newPreviews.push(preview);
+      }
+
+      setImageFiles((prev) => [...prev, ...newFiles]);
+      setImagePreviews((prev) => [...prev, ...newPreviews]);
     } catch (error) {
-      console.error("Compression error:", error);
-      toast.error("Gagal memproses gambar.");
+      console.error("Processing error:", error);
+      toast.error("Gagal memproses beberapa gambar.");
     } finally {
       setIsPending(false);
     }
   };
 
-  const uploadImage = async (file: File) => {
-    let fileExt = file.name.split(".").pop();
+  const removeImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
 
-    if (file.type === "image/jpeg" && fileExt !== "jpg" && fileExt !== "jpeg") {
-      fileExt = "jpg";
-    }
+  const uploadImages = async (files: File[]) => {
+    const uploadPromises = files.map(async (file) => {
+      const fileExt = "jpg";
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `reports/${fileName}`;
 
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `reports/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("jalur-aman")
+        .upload(filePath, file);
 
-    const { error: uploadError } = await supabase.storage
-      .from("jalur-aman")
-      .upload(filePath, file);
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw new Error("Gagal mengunggah salah satu gambar.");
+      }
 
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw new Error("Gagal mengunggah gambar.");
-    }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("jalur-aman").getPublicUrl(filePath);
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("jalur-aman").getPublicUrl(filePath);
+      return publicUrl;
+    });
 
-    return publicUrl;
+    return Promise.all(uploadPromises);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,18 +143,19 @@ export function ReportDialog({
     }
 
     setIsPending(true);
-    let imageUrl = "";
+    let imageUrls: string[] = [];
 
     try {
-      if (imageFile) {
-        imageUrl = await uploadImage(imageFile);
+      if (imageFiles.length > 0) {
+        imageUrls = await uploadImages(imageFiles);
       }
 
       const result = await createReport({
         disasterType,
         severityLevel: parseInt(severity),
         description,
-        imageUrl,
+        imageUrl: imageUrls[0] || "",
+        imageUrls,
         lat: coords.lat,
         lng: coords.lng,
       });
@@ -160,12 +176,13 @@ export function ReportDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 h-full">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>Detail Laporan Bencana</DialogTitle>
             <DialogDescription>
-              Lengkapi informasi berikut untuk membantu proses validasi AI.
+              Lengkapi informasi berikut. Anda dapat mengunggah hingga 5 foto
+              bukti.
             </DialogDescription>
           </DialogHeader>
 
@@ -215,43 +232,45 @@ export function ReportDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label className="text-sm font-semibold">
-                Bukti Foto (Opsional)
+              <Label className="text-sm font-semibold text-zinc-900 flex justify-between">
+                Bukti Foto ({imageFiles.length}/5)
+                <span className="text-[10px] font-normal text-muted-foreground italic">
+                  Opsional
+                </span>
               </Label>
 
-              <div className="flex flex-col gap-3">
-                {imagePreview ? (
-                  <div className="relative group aspect-video rounded-lg overflow-hidden border bg-zinc-100">
+              <div className="grid grid-cols-3 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div
+                    key={index}
+                    className="relative aspect-square rounded-md overflow-hidden border bg-zinc-100 group"
+                  >
                     <Image
-                      src={imagePreview}
-                      alt="Preview"
+                      src={preview}
+                      alt={`Evidence ${index + 1}`}
                       fill
                       className="object-cover"
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview(null);
-                      }}
-                      className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </button>
                   </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center aspect-video rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer transition-colors group">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
-                      <div className="p-3 rounded-full bg-white shadow-sm border group-hover:border-primary transition-colors">
-                        <Camera className="h-6 w-6" />
-                      </div>
-                      <span className="text-xs font-medium">
-                        Klik untuk unggah foto
-                      </span>
-                    </div>
+                ))}
+
+                {imageFiles.length < 5 && (
+                  <label className="flex flex-col items-center justify-center aspect-square rounded-md border-2 border-dashed border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer transition-colors group">
+                    <Camera className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="text-[10px] mt-1 text-muted-foreground font-medium">
+                      Tambah
+                    </span>
                     <input
                       type="file"
                       className="hidden"
+                      multiple
                       accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                       onChange={handleImageChange}
                     />

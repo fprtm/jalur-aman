@@ -7,5 +7,18 @@ dotenv.config({ path: ".env.local" });
 
 const connectionString = process.env.DATABASE_URL!;
 
-export const client = postgres(connectionString, { prepare: false });
+// Singleton pattern for Next.js HMR
+const globalForDb = global as unknown as {
+  client: ReturnType<typeof postgres> | undefined;
+};
+
+export const client =
+  globalForDb.client ??
+  postgres(connectionString, {
+    prepare: false,
+    max: 1, // Supabase pooling is sensitive; keep this low for serverless/dev
+  });
+
+if (process.env.NODE_ENV !== "production") globalForDb.client = client;
+
 export const db = drizzle(client, { schema });

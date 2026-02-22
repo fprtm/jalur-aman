@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MapClient } from "@/components/map/MapClient";
 import { Report } from "@/types/report";
 import { createClient } from "@/lib/supabase/client";
+import { Camera } from "lucide-react";
 
 interface DashboardContainerProps {
   initialReports: any[];
@@ -17,6 +18,7 @@ export function DashboardContainer({
     serverReports.map((r) => ({
       ...r,
       imageUrl: r.imageUrl || r.image_url,
+      imageUrls: r.imageUrls || r.image_urls,
       aiReasoning: r.aiReasoning || r.ai_reasoning,
       createdAt: r.createdAt || r.created_at,
     })),
@@ -63,6 +65,7 @@ export function DashboardContainer({
             ...newReport,
             location,
             imageUrl: newReport.image_url,
+            imageUrls: newReport.image_urls,
             aiReasoning: newReport.ai_reasoning,
             createdAt: newReport.created_at,
           };
@@ -83,6 +86,7 @@ export function DashboardContainer({
             ...updated,
             location,
             imageUrl: updated.image_url,
+            imageUrls: updated.image_urls,
             aiReasoning: updated.ai_reasoning,
             createdAt: updated.created_at,
           };
@@ -132,6 +136,12 @@ export function DashboardContainer({
                         className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"
                       />
+                      {report.imageUrls && report.imageUrls.length > 1 && (
+                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold rounded-md flex items-center gap-1">
+                          <Camera className="h-2.5 w-2.5" />
+                          {report.imageUrls.length} Foto
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center justify-between mb-1">

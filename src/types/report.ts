@@ -4,6 +4,7 @@ export interface Report {
   severityLevel: number;
   description: string | null;
   imageUrl: string | null;
+  imageUrls?: string[] | null;
   location: { lat: number; lng: number };
   status: string;
   aiReasoning?: string | null;
