@@ -8,10 +8,12 @@ import { Camera } from "lucide-react";
 
 interface DashboardContainerProps {
   initialReports: any[];
+  initialShelters: any[];
 }
 
 export function DashboardContainer({
   initialReports: serverReports,
+  initialShelters: serverShelters,
 }: DashboardContainerProps) {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>(() =>
@@ -211,6 +213,7 @@ export function DashboardContainer({
         <div className="md:col-span-3 h-full min-h-[400px]">
           <MapClient
             initialReports={reports}
+            initialShelters={serverShelters}
             selectedReportId={selectedReportId}
           />
         </div>

@@ -17,7 +17,7 @@ export const reportStatusEnum = pgEnum("report_status", [
   "REJECTED",
 ]);
 
-const geographyPoint = customType<{
+export const geographyPoint = customType<{
   data: { lat: number; lng: number };
   driverData: string;
 }>({

@@ -16,7 +16,9 @@ import { ReportDialog } from "./ReportDialog";
 import { MapSearch } from "./MapSearch";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Crosshair, Navigation } from "lucide-react";
+import { RoutingEngine } from "./RoutingEngine";
+import { Crosshair, Navigation, Shield, MapPin, Loader2 } from "lucide-react";
+import { getNearestShelter } from "@/lib/actions/shelter-actions";
 
 // Fix for default marker icons
 const DefaultIcon = L.icon({
@@ -33,6 +35,7 @@ interface MapViewProps {
   center?: [number, number];
   zoom?: number;
   initialReports?: Report[];
+  initialShelters?: any[];
   selectedReportId?: string | null;
 }
 
@@ -82,6 +85,7 @@ export default function MapView({
   center: initialCenter = [-6.2088, 106.8456], // Jakarta
   zoom: initialZoom = 13,
   initialReports = [],
+  initialShelters = [],
   selectedReportId,
 }: MapViewProps) {
   // Use reports from props (managed by DashboardContainer)
@@ -90,6 +94,8 @@ export default function MapView({
     lat: number;
     lng: number;
   } | null>(null);
+
+  const [routeWaypoints, setRouteWaypoints] = useState<[number, number][]>([]);
 
   // Refs to markers to open popups programmatically
   const markerRefs = useRef<{ [key: string]: L.Marker | null }>({});
@@ -229,19 +235,34 @@ export default function MapView({
             <Navigation className="h-4 w-4 text-primary" />
           </Button>
 
-          {/* <Button
-            variant="secondary"
+          <Button
+            variant="default"
             size="sm"
-            className="shadow-md border font-bold bg-white hover:bg-zinc-50 text-primary h-9"
-            onClick={() => {
-              handleMapAction(
-                L.latLng(viewState.center[0], viewState.center[1]),
+            className="shadow-md border font-bold bg-primary hover:bg-primary/90 text-white h-9 px-4 hidden sm:flex items-center gap-2"
+            onClick={async () => {
+              if (!viewState.center) return;
+              toast.promise(
+                getNearestShelter(viewState.center[0], viewState.center[1]),
+                {
+                  loading: "Mencari jalur aman...",
+                  success: (shelter: any) => {
+                    if (shelter) {
+                      setRouteWaypoints([
+                        [viewState.center[0], viewState.center[1]],
+                        [shelter.lat, shelter.lng],
+                      ]);
+                      return `Ditemukan: ${shelter.name}`;
+                    }
+                    return "Tidak ada tempat aman terdekat.";
+                  },
+                  error: "Gagal mencari jalur.",
+                },
               );
-              toast.info("Tentukan lokasi laporan pada peta.");
             }}
           >
-            Lapor Bahaya
-          </Button> */}
+            <Shield className="h-4 w-4" />
+            Cari Jalur Aman
+          </Button>
         </div>
       </div>
 
@@ -259,6 +280,10 @@ export default function MapView({
 
         <MapController center={viewState.center} zoom={viewState.zoom} />
         <MapEvents onMapClick={handleMapAction} />
+
+        {routeWaypoints.length >= 2 && (
+          <RoutingEngine waypoints={routeWaypoints} />
+        )}
 
         {/* User Location Accuracy Circle */}
         {locationAccuracy && (
@@ -359,7 +384,48 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* 2-Step Confirmation Marker */}
+        {/* Shelters / Safe Zones */}
+        {initialShelters.map((shelter) => {
+          // Determine color/icon based on type
+          const isHospital = shelter.type === "HOSPITAL";
+
+          return (
+            <Marker
+              key={shelter.id}
+              position={[
+                shelter.lat || shelter.location.lat,
+                shelter.lng || shelter.location.lng,
+              ]}
+              icon={L.divIcon({
+                className: "custom-div-icon",
+                html: `<div class="p-1 px-2 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 ${isHospital ? "bg-blue-600" : "bg-green-600"} text-white font-bold text-[10px]">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span>${isHospital ? "RS" : "SAFE"}</span>
+                      </div>`,
+                iconSize: [50, 24],
+                iconAnchor: [25, 12],
+              })}
+            >
+              <Popup>
+                <div className="flex flex-col gap-1 min-w-[150px]">
+                  <span className="font-bold text-sm text-green-700 flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    {shelter.name}
+                  </span>
+                  <p className="text-xs text-muted-foreground m-0">
+                    {shelter.description || "Tempat aman evakuasi."}
+                  </p>
+                  <div className="mt-2 pt-2 border-t text-[10px] flex justify-between items-center text-zinc-500">
+                    <span>Kapasitas: {shelter.capacity || "-"}</span>
+                    <span className="bg-green-100 text-green-700 px-1.5 rounded">
+                      Buka
+                    </span>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
         {showConfirmPopup && selectedCoords && (
           <Marker
             position={[selectedCoords.lat, selectedCoords.lng]}

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getReports } from "@/lib/actions/report-actions";
+import { getShelters } from "@/lib/actions/shelter-actions";
 import { DashboardContainer } from "@/components/dashboard/DashboardContainer";
 
 export default async function Home() {
@@ -15,7 +16,7 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const reports = await getReports();
+  const [reports, shelters] = await Promise.all([getReports(), getShelters()]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -49,7 +50,7 @@ export default async function Home() {
       </header>
 
       {/* Main Content */}
-      <DashboardContainer initialReports={reports} />
+      <DashboardContainer initialReports={reports} initialShelters={shelters} />
     </div>
   );
 }

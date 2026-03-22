@@ -18,14 +18,17 @@ const MapView = dynamic(() => import("./MapView"), {
 
 export function MapClient({
   initialReports,
+  initialShelters,
   selectedReportId,
 }: {
   initialReports: any[];
+  initialShelters?: any[];
   selectedReportId?: string | null;
 }) {
   return (
     <MapView
       initialReports={initialReports}
+      initialShelters={initialShelters}
       selectedReportId={selectedReportId}
     />
   );
